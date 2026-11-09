@@ -4,10 +4,10 @@ namespace MarksApi.Data;
 public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
-    public DbSet<Student> Student => Set<Student>();
-    public DbSet<Course> Course => Set<Course>();
-    public DbSet<Enrollment> Enrollment => Set<Enrollment>();
-    public DbSet<User> User => Set<User>();
+    public DbSet<Student> Students { get; set; } = null!;
+    public DbSet<Course> Courses { get; set; } = null!;
+    public DbSet<Enrollment> Enrollments { get; set; } = null!;
+    public DbSet<User> Users { get; set; } = null!;
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Student>(e=>{
