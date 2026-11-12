@@ -15,7 +15,8 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options
         .UseNpgsql(builder.Configuration.GetConnectionString("Database"))
         .UseSnakeCaseNamingConvention());
-
+        
+builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services
