@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using MarksApi.Data;
 using MarksApi.Services;
 using MarksApi.Dtos;
+using Scalar.AspNetCore;
 
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -18,7 +19,6 @@ builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
-
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -39,8 +39,16 @@ builder.Services
 builder.Services.AddAuthorization();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 builder.Services.AddProblemDetails();
+builder.Services.AddHealthChecks().AddDbContextCheck<AppDbContext>();
+builder.Services.AddOpenApi();
+
+var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod()));
+
 var app = builder.Build();
 app.UseExceptionHandler();
+app.UseHttpsRedirection();
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 using (var scope = app.Services.CreateScope())
@@ -48,7 +56,9 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await DbSeeder.SeedAsync(db);
 }
-
+app.MapOpenApi();
+app.MapScalarApiReference();
+app.MapHealthChecks("/health");
 app.MapGet("/", () => "Hello");
 
 app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService auth, CancellationToken ct) =>
