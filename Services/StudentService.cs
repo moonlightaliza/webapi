@@ -25,7 +25,8 @@ public class StudentService : IStudentService
             {
                 Id = s.Id,
                 RegistrationNo = s.RegistrationNo,
-                FullName = s.FullName
+                FullName = s.FullName,
+                Email = s.Email
             })
             .FirstOrDefaultAsync(ct);
     }
@@ -33,14 +34,14 @@ public class StudentService : IStudentService
     public Task<PagedResult<StudentResponse>> ListAsync(int page, int pageSize, string? search, string? sort, CancellationToken ct)
         => throw new NotImplementedException();
 
-    public Task<StudentResponse> CreateAsync(StudentRequest request, CancellationToken ct)
+    public async Task<StudentResponse> CreateAsync(StudentRequest request, CancellationToken ct)
     {
-        var student = new Student;
+        var student = new Student
         {
             RegistrationNo = request.RegistrationNo.Trim(),
             FullName = request.FullName.Trim(),
             Email = request.Email.Trim().ToLowerInvariant(),
-            CreatedAtUtc = DateTime.UTCNow
+            CreatedAtUtc = DateTime.UtcNow
         };
         _db.Students.Add(student);
 
@@ -51,7 +52,7 @@ public class StudentService : IStudentService
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23505" })
         {
             _logger.LogWarning("Create student failed: duplicate registration number or email {RegistrationNo}", request.RegistrationNo);
-            throw new ConflictException("Duplicate Student", "A student with this registration number or email already exists.");
+            throw new ConflictException("Duplicate student", "A student with this registration number or email already exists.");
 
         }
         _logger.LogInformation("Student created with id {Id}", student.Id);
