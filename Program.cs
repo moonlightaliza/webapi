@@ -3,6 +3,7 @@ using MarksApi.Data;
 using MarksApi.Services;
 using MarksApi.Dtos;
 using Scalar.AspNetCore;
+using System.Security.Claims;
 
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -76,11 +77,16 @@ app.MapPost("/api/students", async (StudentRequest request, IStudentService stud
     return Results.Created($"/api/students/{result.Id}", result);
 }).RequireAuthorization(p => p.RequireRole("Teacher"));
 
-app.MapGet("/api/students/{id:int}", async (int id, IStudentService studservice, CancellationToken ct) =>
+app.MapGet("/api/students/{id:int}", async (int id, ClaimsPrincipal user, IStudentService studservice, CancellationToken ct) =>
 {
+     if (!user.IsInRole("Teacher"))
+    {
+        var ownId = user.FindFirst("StudentId")?.Value;
+        if (ownId != id.ToString()) return Results.Forbid();
+    }
     var result = await studservice.GetAsync(id, ct);
     return result is null ? Results.NotFound() : Results.Ok(result);
-}).RequireAuthorization(p => p.RequireRole("Teacher"));
+}).RequireAuthorization();
 
 app.MapGet("/api/students", async (IStudentService studservice, CancellationToken ct,
     int page = 1, int pageSize = 10, string? search = null, string? sort = null) =>

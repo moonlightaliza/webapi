@@ -47,6 +47,10 @@ public class AuthService : IAuthService
             new(ClaimTypes.Name, user.Username),
             new(ClaimTypes.Role, user.Role)
         };
+        if (user.StudentId is not null)
+        {
+            claims.Add(new Claim("StudentId", user.StudentId.ToString()!));
+        }
     
     
 
