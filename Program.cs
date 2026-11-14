@@ -16,6 +16,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<ICourseService, CourseService>();
+builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services
@@ -120,6 +121,35 @@ app.MapPut("/api/courses/{id:int}", async (int id, CourseRequest request, ICours
 app.MapDelete("/api/courses/{id:int}", async (int id, ICourseService courseService, CancellationToken ct) =>
 {
     return await courseService.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound();
+}).RequireAuthorization(p => p.RequireRole("Teacher"));
+
+// Enrollments
+app.MapPost("/api/courses/{courseId:int}/enrollments", async (int courseId, EnrollmentRequest request, IEnrollmentService enrollmentService, CancellationToken ct) =>
+{
+    var result = await enrollmentService.CreateAsync(courseId, request, ct);
+    return result is null
+        ? Results.NotFound()
+        : Results.Created($"/api/courses/{courseId}/enrollments", result);
+}).RequireAuthorization(p => p.RequireRole("Teacher"));
+
+app.MapGet("/api/courses/{courseId:int}/enrollments", async (int courseId, IEnrollmentService enrollmentService, CancellationToken ct,
+    int page = 1, int pageSize = 10) =>
+{
+    var result = await enrollmentService.ListByCourseAsync(courseId, page, pageSize, ct);
+    return result is null ? Results.NotFound() : Results.Ok(result);
+}).RequireAuthorization(p => p.RequireRole("Teacher"));
+
+app.MapPut("/api/enrollments/{id:int}/mark", async (int id, MarkRequest request, IEnrollmentService enrollmentService, CancellationToken ct) =>
+{
+    var errors = MarkValidator.Validate(request);
+    if (errors.Count > 0) return Results.ValidationProblem(errors);
+    var updated = await enrollmentService.SetMarkAsync(id, request, ct);
+    return updated is null ? Results.NotFound() : Results.Ok(updated);
+}).RequireAuthorization(p => p.RequireRole("Teacher"));
+
+app.MapDelete("/api/enrollments/{id:int}", async (int id, IEnrollmentService enrollmentService, CancellationToken ct) =>
+{
+    return await enrollmentService.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound();
 }).RequireAuthorization(p => p.RequireRole("Teacher"));
 
 app.Run();
