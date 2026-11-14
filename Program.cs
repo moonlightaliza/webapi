@@ -7,8 +7,6 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
-
-
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -17,6 +15,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         .UseSnakeCaseNamingConvention());
 
 builder.Services.AddScoped<IStudentService, StudentService>();
+builder.Services.AddScoped<ICourseService, CourseService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services
@@ -32,7 +31,7 @@ builder.Services
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(
-            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
         };
     });
 
@@ -50,23 +49,26 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.MapGet("/", () => "Hello");
+
 app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService auth, CancellationToken ct) =>
 {
     var result = await auth.LoginAsync(request, ct);
     return result is null ? Results.Unauthorized() : Results.Ok(result);
 });
-app.MapPost("/api/students", async (StudentRequest request, IStudentService studservice, CancellationToken ct ) =>
+
+// Students
+app.MapPost("/api/students", async (StudentRequest request, IStudentService studservice, CancellationToken ct) =>
 {
     var errors = StudentValidator.Validate(request);
     if (errors.Count > 0) return Results.ValidationProblem(errors);
     var result = await studservice.CreateAsync(request, ct);
     return Results.Created($"/api/students/{result.Id}", result);
 }).RequireAuthorization(p => p.RequireRole("Teacher"));
-app.MapGet("/api/students/{id:int}", async(int id, IStudentService studservice, CancellationToken ct ) =>
+
+app.MapGet("/api/students/{id:int}", async (int id, IStudentService studservice, CancellationToken ct) =>
 {
-    
     var result = await studservice.GetAsync(id, ct);
-    return result is null ? Results.NotFound(): Results.Ok(result);
+    return result is null ? Results.NotFound() : Results.Ok(result);
 }).RequireAuthorization(p => p.RequireRole("Teacher"));
 
 app.MapGet("/api/students", async (IStudentService studservice, CancellationToken ct,
@@ -85,6 +87,39 @@ app.MapPut("/api/students/{id:int}", async (int id, StudentRequest request, IStu
 app.MapDelete("/api/students/{id:int}", async (int id, IStudentService studservice, CancellationToken ct) =>
 {
     return await studservice.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound();
+}).RequireAuthorization(p => p.RequireRole("Teacher"));
+
+// Courses
+app.MapPost("/api/courses", async (CourseRequest request, ICourseService courseService, CancellationToken ct) =>
+{
+    var errors = CourseValidator.Validate(request);
+    if (errors.Count > 0) return Results.ValidationProblem(errors);
+    var result = await courseService.CreateAsync(request, ct);
+    return Results.Created($"/api/courses/{result.Id}", result);
+}).RequireAuthorization(p => p.RequireRole("Teacher"));
+
+app.MapGet("/api/courses/{id:int}", async (int id, ICourseService courseService, CancellationToken ct) =>
+{
+    var result = await courseService.GetAsync(id, ct);
+    return result is null ? Results.NotFound() : Results.Ok(result);
+}).RequireAuthorization();
+
+app.MapGet("/api/courses", async (ICourseService courseService, CancellationToken ct,
+    int page = 1, int pageSize = 10, string? search = null, string? sort = null) =>
+    Results.Ok(await courseService.ListAsync(page, pageSize, search, sort, ct)))
+    .RequireAuthorization();
+
+app.MapPut("/api/courses/{id:int}", async (int id, CourseRequest request, ICourseService courseService, CancellationToken ct) =>
+{
+    var errors = CourseValidator.Validate(request);
+    if (errors.Count > 0) return Results.ValidationProblem(errors);
+    var updated = await courseService.UpdateAsync(id, request, ct);
+    return updated is null ? Results.NotFound() : Results.Ok(updated);
+}).RequireAuthorization(p => p.RequireRole("Teacher"));
+
+app.MapDelete("/api/courses/{id:int}", async (int id, ICourseService courseService, CancellationToken ct) =>
+{
+    return await courseService.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound();
 }).RequireAuthorization(p => p.RequireRole("Teacher"));
 
 app.Run();
