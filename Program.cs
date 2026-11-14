@@ -57,13 +57,34 @@ app.MapPost("/api/auth/login", async (LoginRequest request, IAuthService auth, C
 });
 app.MapPost("/api/students", async (StudentRequest request, IStudentService studservice, CancellationToken ct ) =>
 {
+    var errors = StudentValidator.Validate(request);
+    if (errors.Count > 0) return Results.ValidationProblem(errors);
     var result = await studservice.CreateAsync(request, ct);
     return Results.Created($"/api/students/{result.Id}", result);
 }).RequireAuthorization(p => p.RequireRole("Teacher"));
 app.MapGet("/api/students/{id:int}", async(int id, IStudentService studservice, CancellationToken ct ) =>
 {
+    
     var result = await studservice.GetAsync(id, ct);
     return result is null ? Results.NotFound(): Results.Ok(result);
+}).RequireAuthorization(p => p.RequireRole("Teacher"));
+
+app.MapGet("/api/students", async (IStudentService studservice, CancellationToken ct,
+    int page = 1, int pageSize = 10, string? search = null, string? sort = null) =>
+    Results.Ok(await studservice.ListAsync(page, pageSize, search, sort, ct)))
+    .RequireAuthorization(p => p.RequireRole("Teacher"));
+
+app.MapPut("/api/students/{id:int}", async (int id, StudentRequest request, IStudentService studservice, CancellationToken ct) =>
+{
+    var errors = StudentValidator.Validate(request);
+    if (errors.Count > 0) return Results.ValidationProblem(errors);
+    var updated = await studservice.UpdateAsync(id, request, ct);
+    return updated is null ? Results.NotFound() : Results.Ok(updated);
+}).RequireAuthorization(p => p.RequireRole("Teacher"));
+
+app.MapDelete("/api/students/{id:int}", async (int id, IStudentService studservice, CancellationToken ct) =>
+{
+    return await studservice.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound();
 }).RequireAuthorization(p => p.RequireRole("Teacher"));
 
 app.Run();

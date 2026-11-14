@@ -125,7 +125,7 @@ public class StudentService : IStudentService
         {
             await _db.SaveChangesAsync(ct);
         }
-        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23503" })
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: "23503" or "23001" })
         {
             _logger.LogWarning("Delete student {Id} blocked: still has enrollments", id);
             throw new ConflictException("Student has enrollments", "A student that still has enrollments cannot be deleted.");
