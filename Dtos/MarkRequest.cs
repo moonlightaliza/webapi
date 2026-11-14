@@ -1,6 +1,6 @@
 namespace MarksApi.Dtos;
 
-public class EnrollmentRequest
+public class MarkRequest
 {
-    public int StudentId { get; set; }
+    public int? Mark { get; set; }
 }
