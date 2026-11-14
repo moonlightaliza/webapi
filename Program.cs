@@ -37,7 +37,10 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 var app = builder.Build();
+app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
 using (var scope = app.Services.CreateScope())
