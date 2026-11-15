@@ -4,12 +4,14 @@ using MarksApi.Services;
 using MarksApi.Dtos;
 using Scalar.AspNetCore;
 using System.Security.Claims;
+using MarksApi.SmokeTests;
 
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
+var smokeMode = args.Contains("--smoke-test"); 
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options
@@ -168,4 +170,13 @@ app.MapDelete("/api/enrollments/{id:int}", async (int id, IEnrollmentService enr
     return await enrollmentService.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound();
 }).RequireAuthorization(p => p.RequireRole("Teacher"));
 
+if (smokeMode)
+{
+    await app.StartAsync();
+    var baseUrl = app.Urls.First();
+    var exitCode = await MarksSmokeRunner.RunAsync(baseUrl, app.Configuration);
+    await app.StopAsync();
+    return exitCode;
+}
 app.Run();
+return 0;
