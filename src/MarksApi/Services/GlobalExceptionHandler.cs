@@ -18,6 +18,10 @@ public class GlobalExceptionHandler : IExceptionHandler
         {
             problem = new ProblemDetails { Status = 409, Title = conflict.Title, Detail = conflict.Message };
         }
+        else if (exception is BadHttpRequestException bad)
+        {
+            problem = new ProblemDetails { Status = 400, Title = "Bad Request", Detail = bad.Message};
+        }
         else
         {
             _logger.LogError(exception, "Unhandled exception");
