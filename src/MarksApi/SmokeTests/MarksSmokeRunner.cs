@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using System.Net.Http.Headers;
 
 namespace MarksApi.SmokeTests;
 
@@ -53,7 +54,8 @@ public static class MarksSmokeRunner
     private static async Task Check(HttpClient client, string method, string path, int expected, object? body = null, string? token = null)
     {
         var request = new HttpRequestMessage(new HttpMethod(method), path);
-        // add body as JSON if given, add the bearer header if a token is given
+        if (body is not null) request.Content = JsonContent.Create(body);
+        if (token is not null) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
         var response = await client.SendAsync(request);
         var actual = (int)response.StatusCode;
         var ok = actual == expected;
