@@ -24,6 +24,8 @@ public static class MarksSmokeRunner
 
         // 2. call every endpoint with a valid request
         await Check(client, "GET", "/health", 200, token: teacherToken);
+        await Check(client, "POST", "/api/students", 201,
+        new { registrationNo = "Smoke-001", fullName = "Aliza Zia", email = "alizazia33@gmail.com" }, token: teacherToken);
 
         // 3. call the failing cases
         // 4. delete everything whose name starts with "SMOKE-"
