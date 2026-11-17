@@ -52,6 +52,8 @@ psql -U postgres
 
 If your PostgreSQL does not run on the default port 5432, add `-p <your port>` to the command above.
 
+On Windows, if `psql` is not recognized, open **SQL Shell (psql)** from the Start menu, or use the full path: `"C:\Program Files\PostgreSQL\<version>\bin\psql" -U postgres`.
+
 ```sql
 CREATE USER marks_user WITH PASSWORD 'YOUR_MARKS_USER_PASSWORD';
 CREATE DATABASE marks_db OWNER marks_user;
@@ -61,6 +63,8 @@ CREATE DATABASE marks_db OWNER marks_user;
 ### 3. Configure database, JWT and smoke-test settings
 
 For development, store secrets with `dotnet user-secrets`. They live outside the repository, so nothing secret is ever committed.
+
+**Replace the password and port with your own values.**
 
 ```bash
 dotnet user-secrets init --project src/MarksApi/MarksApi.csproj
@@ -109,7 +113,13 @@ If it is already installed, update it instead:
 dotnet tool update --global dotnet-ef
 ```
 
-Apply the migrations (this needs the connection string from step 3):
+Restore the packages first. On a fresh clone `dotnet ef` fails without this:
+
+```bash
+dotnet restore src/MarksApi/MarksApi.csproj
+```
+
+Then apply the migrations (this needs the connection string from step 3):
 
 ```bash
 dotnet ef database update --project src/MarksApi/MarksApi.csproj
@@ -118,7 +128,6 @@ dotnet ef database update --project src/MarksApi/MarksApi.csproj
 ### 5. Build and run the API
 
 ```bash
-dotnet restore src/MarksApi/MarksApi.csproj
 dotnet build src/MarksApi/MarksApi.csproj
 dotnet run --project src/MarksApi/MarksApi.csproj
 ```
@@ -296,8 +305,10 @@ Whether a course or student exists is not a uniqueness question, so these are ch
 To regenerate the schema export:
 
 ```bash
-pg_dump --schema-only -h localhost -U marks_user -f db/schema.sql marks_db
+pg_dump --schema-only -h localhost -p 5432 -U marks_user -f db/schema.sql marks_db
 ```
+
+Replace `5432` with the port your PostgreSQL runs on. The command fails on a non-default port without it, and it asks for the `marks_user` password.
 
 ## ER diagram
 
