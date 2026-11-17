@@ -24,11 +24,14 @@ public static class MarksSmokeRunner
 
         // 2. call every endpoint with a valid request
         await Check(client, "GET", "/health", 200, token: teacherToken);
-        await Check(client, "POST", "/api/students", 201,
-        new { registrationNo = "Smoke-001", fullName = "Aliza Zia", email = "alizazia33@gmail.com" }, token: teacherToken);
+        var createRes = await Check(client, "POST", "/api/students", 201,
+            new{ registrationNo = "SMOKE-001", fullName = "Aliza Zia", email = "alizazia33@gmail.com" }, token: teacherToken);
+        var studentId = await ReadIdAsync(createRes);
+        await Check(client, "GET", $"/api/students/{studentId}", 200, token: teacherToken);
 
         // 3. call the failing cases
         // 4. delete everything whose name starts with "SMOKE-"
+        await Check(client, "DELETE", $"/api/students/{studentId}", 204, token: teacherToken);
 
         Console.WriteLine(_failures == 0 ? "ALL CHECKS PASSED" : $"{_failures} CHECK(S) FAILED");
         return _failures == 0 ? 0 : 1;
@@ -53,7 +56,7 @@ public static class MarksSmokeRunner
         return doc.RootElement.GetProperty("token").GetString();
     }
 
-    private static async Task Check(HttpClient client, string method, string path, int expected, object? body = null, string? token = null)
+    private static async Task<HttpResponseMessage> Check(HttpClient client, string method, string path, int expected, object? body = null, string? token = null)
     {
         var request = new HttpRequestMessage(new HttpMethod(method), path);
         if (body is not null) request.Content = JsonContent.Create(body);
@@ -63,5 +66,12 @@ public static class MarksSmokeRunner
         var ok = actual == expected;
         if (!ok) _failures++;
         Console.WriteLine($"{(ok ? "PASS" : "FAIL")} {method} {path} expected {expected} got {actual}");
+        return response;
+    }
+    //Helper function
+    private static async Task<int> ReadIdAsync(HttpResponseMessage res)
+    {
+        using var doc = JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+        return doc.RootElement.GetProperty("id").GetInt32();
     }
 }
