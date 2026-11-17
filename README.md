@@ -4,18 +4,24 @@ A .NET REST API for managing students, courses, enrollments and marks. It uses P
 
 ## Project description
 
-This API supports a complete student marks management workflow:
+This API supports a student marks management workflow:
 
 - Student registration and lookup
 - Course creation and listing
 - Enrollment of students in courses
 - Assignment and update of marks
 - Teacher-only administrative actions
-- Student self-access to their own profile
+- Student self-access to their own profile (`GET /api/students/{id}` only)
 - Validation and conflict handling for duplicate data
 - Database-enforced integrity rules
 
-The system follows a teacher-student model: teachers manage academic records, while students can only view their own record and related information.
+The system follows a teacher-student model: teachers manage academic records, while a student can read only their own student record.
+
+### Not implemented
+
+- There are no statistics endpoints (averages, rankings, course summaries).
+- There are no transcript endpoints.
+- Students cannot list their own enrollments or marks. The only student self-access rule is on `GET /api/students/{id}`.
 
 ## Requirements
 
@@ -27,7 +33,7 @@ The system follows a teacher-student model: teachers manage academic records, wh
 
 ## Run from a clean clone
 
-The commands below assume a Bash-compatible terminal. PowerShell equivalents are given where they differ.
+Run every command from the repository root. The commands work in Bash and in PowerShell unless a section says otherwise. Follow the steps in order: the connection string (step 3) must be set before the migrations (step 4), or `dotnet ef` fails with a misleading error.
 
 ### 1. Clone the repository
 
@@ -36,44 +42,60 @@ git clone https://github.com/moonlightaliza/webapi.git
 cd webapi
 ```
 
-### 2. Create the PostgreSQL database
+### 2. Create the database user and database
 
-Create a database named `marks_db`:
-
-```bash
-createdb -U postgres marks_db
-```
-
-If `createdb` is not available, use psql or pgAdmin:
+Use the `postgres` admin account only for this one-time step. The API itself never runs as `postgres`.
 
 ```bash
 psql -U postgres
 ```
 
+If your PostgreSQL does not run on the default port 5432, add `-p <your port>` to the command above.
+
 ```sql
-CREATE DATABASE marks_db;
+CREATE USER marks_user WITH PASSWORD 'YOUR_MARKS_USER_PASSWORD';
+CREATE DATABASE marks_db OWNER marks_user;
 \q
 ```
 
-### 3. Configure database and JWT settings
+### 3. Configure database, JWT and smoke-test settings
 
-Set the connection string and the JWT key as environment variables. Do not put them in any committed file.
-
-**Linux / macOS**
+For development, store secrets with `dotnet user-secrets`. They live outside the repository, so nothing secret is ever committed.
 
 ```bash
-export ConnectionStrings__Database="Host=localhost;Port=5432;Database=marks_db;Username=postgres;Password=YOUR_POSTGRES_PASSWORD"
+dotnet user-secrets init --project src/MarksApi/MarksApi.csproj
+dotnet user-secrets set "ConnectionStrings:Database" "Host=localhost;Port=5432;Database=marks_db;Username=marks_user;Password=YOUR_MARKS_USER_PASSWORD" --project src/MarksApi/MarksApi.csproj
+dotnet user-secrets set "Jwt:Key" "replace-this-with-a-long-random-secret-key-of-at-least-32-characters" --project src/MarksApi/MarksApi.csproj
+```
+
+Use whatever port your PostgreSQL runs on in the `Port=` part of the connection string.
+
+The smoke test (see below) also needs four more secrets:
+
+```bash
+dotnet user-secrets set "Smoke:TeacherUsername" "javeria56" --project src/MarksApi/MarksApi.csproj
+dotnet user-secrets set "Smoke:TeacherPassword" "oiYwe32_09" --project src/MarksApi/MarksApi.csproj
+dotnet user-secrets set "Smoke:StudentUsername" "saraahmed1" --project src/MarksApi/MarksApi.csproj
+dotnet user-secrets set "Smoke:StudentPassword" "Adscxx234_" --project src/MarksApi/MarksApi.csproj
+```
+
+**On a server**, use environment variables instead of user-secrets:
+
+Linux / macOS
+
+```bash
+export ConnectionStrings__Database="Host=localhost;Port=5432;Database=marks_db;Username=marks_user;Password=YOUR_MARKS_USER_PASSWORD"
 export Jwt__Key="replace-this-with-a-long-random-secret-key-of-at-least-32-characters"
 ```
 
-**Windows (PowerShell)**
+Windows (PowerShell)
 
 ```powershell
-$env:ConnectionStrings__Database = "Host=localhost;Port=5432;Database=marks_db;Username=postgres;Password=YOUR_POSTGRES_PASSWORD"
+$env:ConnectionStrings__Database = "Host=localhost;Port=5432;Database=marks_db;Username=marks_user;Password=YOUR_MARKS_USER_PASSWORD"
 $env:Jwt__Key = "replace-this-with-a-long-random-secret-key-of-at-least-32-characters"
 ```
 
-The other settings (`Jwt:Issuer`, `Jwt:Audience`, CORS, logging) are non-secret. See `appsettings.Example.json` for every setting and its expected shape.
+The other settings (`Jwt:Issuer`, `Jwt:Audience`, `Jwt:ExpiryMinutes`, PassMark, CORS, logging) are non-secret. `appsettings.Example.json` in the repository root lists every setting with fake values.
 
 ### 4. Install the EF Core tools and apply migrations
 
@@ -87,7 +109,7 @@ If it is already installed, update it instead:
 dotnet tool update --global dotnet-ef
 ```
 
-Apply the migrations:
+Apply the migrations (this needs the connection string from step 3):
 
 ```bash
 dotnet ef database update --project src/MarksApi/MarksApi.csproj
@@ -101,24 +123,23 @@ dotnet build src/MarksApi/MarksApi.csproj
 dotnet run --project src/MarksApi/MarksApi.csproj
 ```
 
-The API typically runs on:
+The console prints the addresses the API listens on (`Now listening on: ...`). They come from `src/MarksApi/Properties/launchSettings.json`. In this project that is:
 
-- HTTPS: `https://localhost:7159`
 - HTTP: `http://localhost:5250`
 
-If you see an HTTPS certificate warning, run:
-
-```bash
-dotnet dev-certs https --trust
-```
+If you add an HTTPS profile to `launchSettings.json`, trust the development certificate with `dotnet dev-certs https --trust`.
 
 Seed data (demo accounts) is created automatically on startup.
 
 ## API documentation and health check
 
-- Interactive API reference: `https://localhost:7159/scalar`
-- OpenAPI document: `https://localhost:7159/openapi/v1.json`
-- Health check: `https://localhost:7159/health` (verifies database connectivity)
+With the API running on `http://localhost:5250`:
+
+- Interactive API reference: `http://localhost:5250/scalar/v1`
+- OpenAPI document: `http://localhost:5250/openapi/v1.json`
+- Health check: `http://localhost:5250/health` (verifies database connectivity)
+
+If your console prints a different address, use that one.
 
 ## Authentication
 
@@ -188,14 +209,20 @@ All paths are relative to the API base URL.
 | PUT | `/api/enrollments/{id}/mark` | Teacher | Set or update a mark |
 | DELETE | `/api/enrollments/{id}` | Teacher | Remove an enrollment |
 
+### Health
+
+| Method | Path | Access | Purpose |
+| --- | --- | --- | --- |
+| GET | `/health` | Public | Check API and database connectivity |
+
 List endpoints accept `page` (default 1) and `pageSize` (default 10, maximum 50). Student and course lists also accept `search` and `sort`.
 
 ## Postman
 
 Import these files into Postman:
 
-- `MarksApi.postman_collection.json`
-- `Local.postman_environment.json`
+- `postman/MarksApi.postman_collection.json`
+- `postman/Local.postman_environment.json`
 
 Then:
 
@@ -208,16 +235,22 @@ The environment file in the repository has no token value. Do not commit a real 
 
 ## Smoke test
 
-`<Replace this with how your smoke test is started, for example: dotnet run --project src/MarksApi/MarksApi.csproj -- --smoke-test>`
+The smoke test needs PostgreSQL running, the migrations applied, and the four `Smoke:` secrets from step 3 set. Without them it stops at login.
+
+Stop any other running copy of the API first, because the smoke test starts its own instance. From the repository root:
+
+```bash
+dotnet run --project src/MarksApi/MarksApi.csproj -- --smoke-test
+```
 
 The smoke test:
 
-- Runs only when requested, never on normal startup
-- Makes real calls to every endpoint, including failure cases
-- Checks login, student, course and enrollment creation, mark updates, duplicate conflicts (409) and forbidden access (403)
-- Reads credentials from configuration, with no secrets in code
-- Cleans up the data it creates
-- Prints clear results and exits with code `0` when all checks pass
+- Runs only when `--smoke-test` is passed, never on normal startup
+- Logs in as a teacher and as a student, using credentials read from configuration (no secrets in code)
+- Makes a real call to every endpoint with a valid request: health, students, courses, enrollments and mark updates
+- Calls the failing cases: no token (401), student token on a teacher endpoint (403), missing id (404), invalid input (400), and duplicate student, course and enrollment (409)
+- Cleans up the data it creates: all of it is named `SMOKE-...`, and it deletes the enrollment, then the student, then the course, so a second run gives the same result
+- Prints `PASS` or `FAIL` for each check, then `ALL CHECKS PASSED` and exits with code `0`, or `N CHECK(S) FAILED` and exits with code `1`
 
 ## Design decisions
 
@@ -263,12 +296,12 @@ Whether a course or student exists is not a uniqueness question, so these are ch
 To regenerate the schema export:
 
 ```bash
-pg_dump --schema-only -f db/schema.sql marks_db
+pg_dump --schema-only -h localhost -U marks_user -f db/schema.sql marks_db
 ```
 
 ## ER diagram
 
-`ER_Diagram.png` shows the four tables and their relationships:
+`docs/erd.png` shows the four tables and their relationships:
 
 - `students`
 - `courses`
@@ -284,33 +317,7 @@ Relationships:
 
 ## Configuration example
 
-`appsettings.Example.json` lists every setting with fake values only:
-
-```json
-{
-  "ConnectionStrings": {
-    "Database": "Host=localhost;Port=5432;Database=marks_db;Username=postgres;Password=fake_password_123"
-  },
-  "Jwt": {
-    "Key": "this-is-a-fake-secret-key-for-example-only-123456",
-    "Issuer": "MarksApi",
-    "Audience": "MarksApiClients",
-    "ExpiryMinutes": 60
-  },
-  "Logging": {
-    "LogLevel": {
-      "Default": "Information",
-      "Microsoft.AspNetCore": "Warning"
-    }
-  },
-  "AllowedHosts": "*",
-  "Cors": {
-    "AllowedOrigins": [
-      "http://localhost:3000"
-    ]
-  }
-}
-```
+`appsettings.Example.json` in the repository root lists every setting with fake values only, including the PassMark and `Smoke` settings. Copy the shape from that file; never put real secrets in it.
 
 ## Project structure
 
@@ -322,13 +329,19 @@ Relationships:
 │       ├── Dtos/
 │       ├── Services/
 │       ├── Migrations/
+│       ├── SmokeTests/
+│       ├── Properties/
+│       │   └── launchSettings.json
 │       ├── Program.cs
-│       ├── appsettings.Example.json
 │       └── MarksApi.csproj
 ├── db/
 │   └── schema.sql
-├── MarksApi.postman_collection.json
-├── Local.postman_environment.json
-├── ER_Diagram.png
+├── docs/
+│   ├── erd.png
+│   └── screenshots/
+├── postman/
+│   ├── MarksApi.postman_collection.json
+│   └── Local.postman_environment.json
+├── appsettings.Example.json
 └── README.md
 ```
