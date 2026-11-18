@@ -8,11 +8,13 @@ namespace MarksApi.Services;
 public class CourseService : ICourseService
 {
     private readonly AppDbContext _db;
+    private readonly IConfiguration _config;
     private readonly ILogger<CourseService> _logger;
 
-    public CourseService(AppDbContext db, ILogger<CourseService> logger)
+    public CourseService(AppDbContext db, IConfiguration config, ILogger<CourseService> logger)
     {
         _db = db;
+        _config = config;
         _logger = logger;
     }
 
@@ -129,5 +131,33 @@ public class CourseService : ICourseService
 
         _logger.LogInformation("Course {Id} deleted", id);
         return true;
+    }
+   public async Task<CourseStatsResponse?> GetStatsAsync(int courseId, CancellationToken ct)
+    {  
+        var course = await _db.Courses.AsNoTracking()
+            .Where(c => c.Id == courseId)
+            .Select(c => new { c.Id, c.Code })
+            .FirstOrDefaultAsync(ct);
+        if (course is null) return null;
+
+        var marks = await _db.Enrollments.AsNoTracking()
+            .Where(e => e.CourseId == courseId)
+            .Select(e => e.Mark)          // int? column
+            .ToListAsync(ct);
+
+        var graded = marks.Where(m => m != null).Select(m => m!.Value).ToList();
+        int passMark = _config.GetValue<int>("PassMark");
+
+        return new CourseStatsResponse
+        {
+            CourseId = course.Id,
+            CourseCode = course.Code,
+            Enrolled = marks.Count,
+            Graded = graded.Count,
+            Average = graded.Count == 0 ? null : graded.Average(),
+            Highest = graded.Count == 0 ? null : graded.Max(),
+            Lowest = graded.Count == 0 ? null : graded.Min(),
+            Passed = graded.Count(m => m >= passMark)
+        };
     }
 }

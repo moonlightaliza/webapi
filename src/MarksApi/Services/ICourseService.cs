@@ -9,4 +9,5 @@ public interface ICourseService
     Task<CourseResponse> CreateAsync(CourseRequest request, CancellationToken ct);
     Task<CourseResponse?> UpdateAsync(int id, CourseRequest request, CancellationToken ct);
     Task<bool> DeleteAsync(int id, CancellationToken ct);
+    Task<CourseStatsResponse?> GetStatsAsync(int courseId, CancellationToken ct);
 }

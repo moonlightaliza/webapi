@@ -128,6 +128,11 @@ app.MapGet("/api/courses", async (ICourseService courseService, CancellationToke
     Results.Ok(await courseService.ListAsync(page, pageSize, search, sort, ct)))
     .RequireAuthorization();
 
+app.MapGet("/api/courses/{courseId:int}/stats", async (int courseId, ICourseService courseService, CancellationToken ct) =>
+{
+    var stats = await courseService.GetStatsAsync(courseId, ct);
+    return stats is null ? Results.NotFound() : Results.Ok(stats); }).RequireAuthorization(p => p.RequireRole("Teacher"));
+
 app.MapPut("/api/courses/{id:int}", async (int id, CourseRequest request, ICourseService courseService, CancellationToken ct) =>
 {
     var errors = CourseValidator.Validate(request);
