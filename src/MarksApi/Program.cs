@@ -103,6 +103,17 @@ app.MapPut("/api/students/{id:int}", async (int id, StudentRequest request, IStu
     return updated is null ? Results.NotFound() : Results.Ok(updated);
 }).RequireAuthorization(p => p.RequireRole("Teacher"));
 
+app.MapGet("/api/students/{id:int}/transcript", async (int id, ClaimsPrincipal user,
+    IStudentService studentService, CancellationToken ct) =>
+{
+    var isTeacher = user.IsInRole("Teacher");
+    var ownId = user.FindFirst("StudentId")?.Value;
+    if (!isTeacher && ownId != id.ToString()) return Results.Forbid();
+
+    var result = await studentService.GetTranscriptAsync(id, ct);
+    return result is null ? Results.NotFound() : Results.Ok(result);
+}).RequireAuthorization();
+
 app.MapDelete("/api/students/{id:int}", async (int id, IStudentService studservice, CancellationToken ct) =>
 {
     return await studservice.DeleteAsync(id, ct) ? Results.NoContent() : Results.NotFound();

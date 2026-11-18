@@ -1,6 +1,7 @@
 using MarksApi.Data;
 using MarksApi.Dtos;
 using Npgsql;
+using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 
 namespace MarksApi.Services;
@@ -9,11 +10,13 @@ public class StudentService : IStudentService
 {
     private readonly AppDbContext _db;
     private readonly ILogger<StudentService> _logger;
+    private readonly IConfiguration _config;
 
-    public StudentService(AppDbContext db, ILogger<StudentService> logger)
+    public StudentService(AppDbContext db, ILogger<StudentService> logger, IConfiguration config)
     {
         _db = db;
         _logger = logger;
+        _config = config;
     }
 
     public async Task<StudentResponse?> GetAsync(int id, CancellationToken ct)
@@ -133,5 +136,39 @@ public class StudentService : IStudentService
 
         _logger.LogInformation("Student {Id} deleted", id);
         return true;
+    }
+    public async Task<TranscriptResponse?> GetTranscriptAsync(int studentId, CancellationToken ct)
+    {
+        var student = await _db.Students.AsNoTracking()
+            .Where(s => s.Id == studentId)
+            .Select(s => new { s.Id, s.RegistrationNo, s.FullName })
+            .FirstOrDefaultAsync(ct);
+        if (student is null) return null;
+
+        var rows = await _db.Enrollments.AsNoTracking()
+            .Where(e => e.StudentId == studentId)
+            .OrderBy(e => e.Course.Code)
+            .Select(e => new { e.Course.Code, e.Course.CreditHours, e.Mark })
+            .ToListAsync(ct);
+
+        int passMark = _config.GetValue<int>("PassMark");
+        var graded = rows.Where(r => r.Mark != null).ToList();
+        double? weighted = graded.Count == 0 ? null
+            : (double)graded.Sum(r => r.Mark!.Value * r.CreditHours) / graded.Sum(r => r.CreditHours);
+
+        return new TranscriptResponse
+        {
+            StudentId = student.Id,
+            RegistrationNo = student.RegistrationNo,
+            FullName = student.FullName,
+            Courses = rows.Select(r => new TranscriptCourseResponse
+            {
+                Code = r.Code,
+                CreditHours = r.CreditHours,
+                Mark = r.Mark,
+                Passed = r.Mark != null && r.Mark >= passMark
+            }).ToList(),
+            WeightedAverage = weighted
+        };
     }
 }

@@ -9,4 +9,5 @@ public interface IStudentService
     Task<StudentResponse> CreateAsync(StudentRequest request, CancellationToken ct);
     Task<StudentResponse?> UpdateAsync(int id, StudentRequest request, CancellationToken ct);
     Task<bool> DeleteAsync(int id, CancellationToken ct);
+    Task<TranscriptResponse?> GetTranscriptAsync(int studentId, CancellationToken ct);
 }
